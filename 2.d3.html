@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+    </style>
+    <title>Document</title>
+  </head>
+  <body></body>
+
+  <script>
+    console.log(d3);
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const svg = d3
+      .select('body')
+      .append('svg')
+      .attr('width', width)
+      .attr('height', height);
+
+    svg
+      .append('g')
+      .selectAll('rect')
+      .data(d3.range(100))
+      .join('rect')
+      .attr('y', (d) => d * 30)
+      .attr('width', width)
+      .attr('fill', 'orange')
+      .attr('height', 20)
+      .attr('mask', 'url(#circle-mask)');
+
+    const mask = svg.append('mask').attr('id', 'circle-mask');
+    mask
+      .append('rect')
+      .attr('width', width)
+      .attr('height', height)
+      .attr('fill', 'black');
+
+    mask
+      .append('circle')
+      .attr('cx', width / 2)
+      .attr('cy', height / 2)
+      .attr('r', 200)
+      .attr('fill', 'white');
+
+    svg
+      .append('g')
+      .selectAll('rect')
+      .data(d3.range(100))
+      .join('rect')
+      .attr('x', (d) => d * 30)
+      .attr('width', 20)
+      .attr('fill', 'purple')
+      .attr('height', height)
+      .attr('mask', 'url(#circle-mask-2)');
+
+    const mask2 = svg.append('mask').attr('id', 'circle-mask-2');
+    mask2
+      .append('rect')
+      .attr('width', width)
+      .attr('height', height)
+      .attr('fill', 'white');
+
+    mask2
+      .append('circle')
+      .attr('cx', width / 2)
+      .attr('cy', height / 2)
+      .attr('r', 200)
+      .attr('fill', 'black');
+  </script>
+</html>

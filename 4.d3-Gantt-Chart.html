@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://unpkg.com/dayjs@1.11.5/dayjs.min.js"></script>
+    <script src="https://unpkg.com/dayjs@1.8.36/plugin/minMax.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+      }
+      #container {
+        position: relative;
+        overflow: visible;
+        margin: auto;
+      }
+
+      #container svg {
+        display: block;
+        margin: auto;
+      }
+
+      @media screen and (max-width: 480px) {
+        #container {
+          overflow-y: scroll;
+          width: 100vw !important;
+        }
+        #container::-webkit-scrollbar {
+          width: 5px;
+          height: 1px;
+          background-color: #d9d9d9;
+          border-radius: 5px;
+        }
+        #container::-webkit-scrollbar-thumb {
+          border-radius: 5px;
+          background-color: #aaaaaa;
+        }
+      }
+
+      #tooltip {
+        color: white;
+        background: #fa283d;
+        width: 150px;
+        position: absolute;
+        display: none;
+        padding: 3px 6px;
+        margin-left: -90px;
+        font-size: 14px;
+      }
+
+      #tooltip:before {
+        border: solid transparent;
+        content: ' ';
+        height: 0;
+        left: 50%;
+        margin-left: -5px;
+        position: absolute;
+        width: 0;
+        border-width: 10px;
+        border-bottom-color: #fa283d;
+        top: -20px;
+      }
+    </style>
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="container">
+      <div id="tooltip"></div>
+    </div>
+  </body>
+  <script>
+    const taskArray = [
+      {
+        task: 'conceptualize',
+        type: 'development',
+        startTime: '2013-1-28',
+        details: "This actually didn't take any conceptualization",
+        start: 0,
+        end: 3,
+      },
+      {
+        task: 'sketch',
+        type: 'development',
+        startTime: '2013-2-1',
+        endTime: '2013-2-6',
+        details: 'No sketching either, really',
+        start: 1,
+        end: 4,
+      },
+      {
+        task: 'color profiles',
+        type: 'development',
+        startTime: '2013-2-6',
+        endTime: '2013-2-9',
+        start: 2,
+        end: 5,
+      },
+      {
+        task: 'HTML',
+        type: 'coding',
+        startTime: '2013-2-2',
+        endTime: '2013-2-6',
+        details: 'all three lines of it',
+        start: 5,
+        end: 7,
+      },
+      {
+        task: 'write the JS',
+        type: 'coding',
+        startTime: '2013-2-6',
+        endTime: '2013-2-9',
+        start: 5,
+        end: 10,
+      },
+      {
+        task: 'advertise',
+        type: 'promotion',
+        startTime: '2013-2-9',
+        endTime: '2013-2-12',
+        details: 'This counts, right?',
+        start: 10,
+        end: 12,
+      },
+      {
+        task: 'spam links',
+        type: 'promotion',
+        startTime: '2013-2-12',
+        endTime: '2013-2-14',
+        start: 11,
+        end: 13,
+      },
+      {
+        task: 'eat',
+        type: 'celebration',
+        startTime: '2013-2-8',
+        endTime: '2013-2-13',
+        details: 'All the things',
+        start: 12,
+        end: 14,
+      },
+      {
+        task: 'crying',
+        type: 'celebration',
+        startTime: '2013-2-13',
+        endTime: '2013-2-16',
+        start: 12,
+        end: 19,
+      },
+    ];
+
+    const typeArr = [...taskArray.map((item) => item.type)];
+    const categories = typeArr.filter(
+      (ele, pos) => typeArr.indexOf(ele) == pos
+    );
+    const calcCateGoryitemNum = (category) => {
+      return taskArray.filter((item) => item.type == category).length;
+    };
+    const colorMap = {
+      development: '#00b9fa',
+      coding: '#859eff',
+      promotion: '#e370dd',
+      celebration: '#ff3c83',
+    };
+    const categoryTitleXY = {};
+    const categoryYstar = {};
+    const barsXY = {};
+    const xAxisPos = [];
+
+    const boxWidth =
+      parseInt(window.innerWidth) > 600
+        ? parseInt(window.innerWidth) > 1200
+          ? 900
+          : parseInt(window.innerWidth) - 20
+        : 600;
+    document
+      .getElementById('container')
+      .setAttribute('style', `width:${boxWidth}px`);
+
+    const width = boxWidth; //800
+    const height = parseInt(boxWidth) / 2; //600
+    const bgLineHeight = parseInt(height - 60);
+    const topOffset = parseInt(boxWidth / 20); //40
+    const leftOffset = parseInt(boxWidth / 8); //100
+    const rightOffset = parseInt(boxWidth / 20); //40
+    const barHeight = parseInt(boxWidth / 32); //25
+    const barWidth = parseInt(boxWidth / 20); //40
+
+    const xAxisMinMax = [
+      Math.min(...taskArray.map((item) => item.start)),
+      Math.max(...taskArray.map((item) => item.end)),
+    ];
+
+    const svg = d3
+      .select('#container')
+      .append('svg')
+      .attr('width', width)
+      .attr('height', height)
+      .attr('overflow', 'visible');
+
+    // title
+    svg
+      .append('text')
+      .text('Gantt Chart Process')
+      .attr('x', width / 2)
+      .attr('y', barHeight)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', 18)
+      .attr('fill', '#009FFC');
+
+    //bgLine
+    svg
+      .append('g')
+      .selectAll('rect')
+      .data(d3.range(xAxisMinMax[1] + 1))
+      .join('rect')
+      .attr('x', (d, i) => {
+        xAxisPos[i] = leftOffset + d * barWidth;
+        return leftOffset + d * barWidth;
+      })
+      .attr('y', 50)
+      .attr('width', 1)
+      .attr('height', bgLineHeight)
+      .attr('fill', 'gray');
+
+    //xAxis title
+    svg
+      .append('text')
+      .text('months')
+      .attr('x', leftOffset - 40)
+      .attr('y', height)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', 14)
+      .attr('fill', 'gray');
+
+    //xAxis
+    svg
+      .append('g')
+      .selectAll('text')
+      .data(d3.range(xAxisMinMax[1] + 1))
+      .join((enter) => {
+        enter
+          .append('text')
+          .attr('x', (d, i) => xAxisPos[i] - 3)
+          .attr('y', bgLineHeight + 60)
+          .attr('font-size', 12)
+          .attr('text-anchor', 'start')
+          .attr('text-height', 14)
+          .attr('fill', 'gray')
+          .text((d, i) => i);
+      });
+
+    //categories rect
+    let yStart = topOffset + 30;
+    svg
+      .append('g')
+      .selectAll('rect')
+      .data(categories)
+      .join((enter) => {
+        enter
+          .append('rect')
+          .attr('x', 0)
+          .attr('y', (d, i) => {
+            // console.log(d, i, calcCateGoryitemNum(d));
+            let thisTypeHeight = barHeight * calcCateGoryitemNum(d);
+            yStart += thisTypeHeight;
+
+            categoryTitleXY[d] = {
+              x: 10,
+              y: yStart - (barHeight * calcCateGoryitemNum(d)) / 2,
+            };
+            categoryYstar[d] = yStart - thisTypeHeight;
+
+            return yStart - thisTypeHeight;
+          })
+          .attr('width', leftOffset + barWidth * xAxisMinMax[1])
+          .attr('height', (d) => barHeight * calcCateGoryitemNum(d))
+          .attr('fill', (d) => colorMap[d])
+          .attr('opacity', 0.2);
+      });
+
+    //category text
+    svg
+      .append('g')
+      .selectAll('text')
+      .data(categories)
+      .join((enter) => {
+        enter
+          .append('text')
+          .attr('x', (d) => categoryTitleXY[d].x)
+          .attr('y', (d) => categoryTitleXY[d].y)
+          .attr('font-size', 14)
+          .attr('text-anchor', 'start')
+          .attr('text-height', 14)
+          .attr('fill', (d) => colorMap[d])
+          .text((d) => d);
+      });
+
+    //bars
+    svg
+      .append('g')
+      .attr('id', 'barsRects')
+      .selectAll('rect')
+      .data(taskArray)
+      .join((enter) => {
+        return enter
+          .append('rect')
+          .attr('x', (d, i) => {
+            barsXY[i] = { x: leftOffset + d.start * barWidth };
+            return leftOffset + d.start * barWidth;
+          })
+          .attr('width', (d) => {
+            return (d.end - d.start) * barWidth;
+          })
+          .attr('y', (d, i) => {
+            barsXY[i] = { ...barsXY[i], y: topOffset + 30 + barHeight * i };
+            return topOffset + 30 + barHeight * i;
+          })
+          .attr('height', barHeight)
+          .attr('fill', (d) => colorMap[d.type])
+          .attr('id', (d, i) => `barsRectsItem-${i}`);
+      });
+
+    //bars text
+    svg
+      .append('g')
+      .attr('id', 'barsTexts')
+      .selectAll('text')
+      .data(taskArray)
+      .join((enter) => {
+        enter
+          .append('text')
+          .attr('x', (d, i) => {
+            return barsXY[i].x + 10;
+          })
+          .attr('y', (d, i) => {
+            return barHeight > 25 ? barsXY[i].y + 16 : barsXY[i].y + 12;
+          })
+          .attr('font-size', barHeight > 25 ? 14 : 12)
+          .attr('text-anchor', 'start')
+          .attr('text-height', 14)
+          .attr('fill', '#fff')
+          .text((d) => d.task)
+          .attr('id', (d, i) => `barsTextItem-${i}`);
+      });
+
+    // handle event binding
+    function bindToolTipEvent(selecten, selectenItemId, isLeaveOff) {
+      selecten.each((item, i) => {
+        svg
+          .select(`#${selectenItemId}-${i}`)
+          .on('mouseover', (e) => {
+            // console.log(e.target.getAttribute('x'));
+            // console.log(item);
+            let gapMiddle = (item.end - item.start) / 2;
+            let tipHtml = `task:${item.task} <br/>
+           type:${item.type}  <br/>
+           ${item.details || ''}`;
+
+            let tooltip = document.getElementById('tooltip');
+            tooltip.innerHTML = tipHtml;
+            tooltip.style.top =
+              barsXY[i].y + (window.innerWidth < 600 ? 20 : 40) + 'px';
+            tooltip.style.left = barsXY[i].x + gapMiddle * barWidth + 'px';
+            tooltip.style.display = 'block';
+          })
+          .on('mouseout', function () {
+            if (isLeaveOff) {
+              var tooltip = document.getElementById('tooltip');
+              tooltip.style.display = 'none';
+            }
+          });
+      });
+    }
+
+    const barsRectsSelecten = d3.select('#barsRects').selectAll('rect');
+    const barsTextsSelecten = d3.select('#barsTexts').selectAll('text');
+
+    bindToolTipEvent(barsRectsSelecten, 'barsRectsItem', true);
+    bindToolTipEvent(barsTextsSelecten, 'barsTextItem', false);
+  </script>
+</html>

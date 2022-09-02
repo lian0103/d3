@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+    </style>
+    <title>Document</title>
+  </head>
+  <body></body>
+
+  <script>
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const svg = d3
+      .select('body')
+      .append('svg')
+      .attr('width', width)
+      .attr('height', height);
+
+    svg
+      .append('g')
+      .selectAll('rect')
+      .data(d3.range(100))
+      .join('rect')
+      .attr('y', (d) => d * 30)
+      .attr('width', width)
+      .attr('fill', 'orange')
+      .attr('height', 20)
+      .attr('mask', 'url(#mask-1)');
+
+    svg
+      .append('g')
+      .selectAll('rect')
+      .data(d3.range(100))
+      .join('rect')
+      .attr('x', (d) => d * 30)
+      .attr('width', 20)
+      .attr('fill', 'purple')
+      .attr('height', height)
+      .attr('mask', 'url(#mask-2)');
+
+    const renderMask = (selection, id, inverted) => {
+      const mask = selection.append('mask').attr('id', id);
+      mask
+        .append('rect')
+        .attr('width', width)
+        .attr('height', height)
+        .attr('fill', inverted ? 'black' : 'white');
+
+      mask
+        .selectAll('g')
+        .data(d3.range(d3.symbols.length))
+        .join((enter) =>
+          enter
+            .append('g')
+            .attr(
+              'transform',
+              (d) =>
+                `translate(${60 + (d * width) / d3.symbols.length},${
+                  height / 2
+                })`
+            )
+            .append('path')
+            .attr('d', (d) => d3.symbol(d3.symbols[d], 10000)())
+            .attr('fill', inverted ? 'white' : 'black')
+        );
+
+    };
+
+    // renderMask('mask-1', true);
+    // renderMask('mask-2', false);
+
+    // equal to under
+
+    svg.call(renderMask, 'mask-1', true).call(renderMask, 'mask-2', false);
+  </script>
+</html>
