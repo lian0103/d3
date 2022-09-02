@@ -18,9 +18,10 @@
         margin: auto;
       }
 
-      #d3-container svg {
-        display: block;
-        margin: auto;
+      @media screen and (max-width: 600px) {
+        #d3-container {
+          overflow-x: scroll !important;
+        }
       }
 
       #tooltip {
@@ -76,12 +77,19 @@
       const barsXY = {};
       const xAxisPos = [];
 
+      const isOver600Width = boxWidth > 600;
+
       document
         .getElementById('d3-container')
-        .setAttribute('style', `width:${boxWidth}px`);
+        .setAttribute(
+          'style',
+          `width:${isOver600Width ? boxWidth : window.innerWidth}px`
+        );
 
       const width = boxWidth;
-      const height = parseInt(boxWidth * 0.4);
+      const height = isOver600Width
+        ? parseInt(boxWidth * 0.4)
+        : parseInt(boxWidth * 0.45);
       const bgLineHeight = parseInt(height - 60);
       const topOffset = parseInt(boxWidth / 20);
       const leftOffset = parseInt(boxWidth / 8);
@@ -105,7 +113,7 @@
         .scaleTime()
         .range([0, width - leftOffset - rightOffset])
         .domain(xExtent);
-      const formatDate = d3.timeFormat('%Y/%m/%d');
+      const formatDate = d3.timeFormat(isOver600Width ? '%Y/%m/%d' : '%m/%d');
       var xAxis = d3.axisBottom(xScale).tickFormat(formatDate);
 
       //start
@@ -113,8 +121,7 @@
         .select('#d3-container')
         .append('svg')
         .attr('width', width)
-        .attr('height', height)
-        .attr('overflow', 'visible');
+        .attr('height', height + 20);
 
       const xAxisLayer = svg.append('g');
       const titleLayer = svg.append('g');
@@ -153,7 +160,7 @@
       titleLayer
         .append('text')
         .text('Gantt Chart Process')
-        .attr('x', width / 2)
+        .attr('x', isOver600Width ? width / 2 : leftOffset)
         .attr('y', barHeight)
         .attr('text-anchor', 'middle')
         .attr('font-size', 18)
@@ -176,11 +183,11 @@
       //xAxis title
       titleLayer
         .append('text')
-        .text('年/月/日')
+        .text(isOver600Width ? '年/月/日' : '月/日')
         .attr('x', leftOffset - 40)
         .attr('y', height)
         .attr('text-anchor', 'middle')
-        .attr('font-size', 14)
+        .attr('font-size', isOver600Width ? 14 : 12)
         .attr('fill', 'gray');
 
       //xAxis
@@ -225,7 +232,7 @@
             .append('text')
             .attr('x', (d) => categoryTitleXY[d].x)
             .attr('y', (d) => categoryTitleXY[d].y)
-            .attr('font-size', 14)
+            .attr('font-size', isOver600Width ? 14 : 12)
             .attr('text-anchor', 'start')
             .attr('text-height', 14)
             .attr('fill', (d) => colorMap[d])
@@ -268,7 +275,7 @@
             .attr('y', (d, i) => {
               return barHeight > 25 ? barsXY[i].y + 16 : barsXY[i].y + 12;
             })
-            .attr('font-size', barHeight > 25 ? 14 : 12)
+            .attr('font-size', isOver600Width ? 14 : 12)
             .attr('text-anchor', 'start')
             .attr('text-height', 14)
             .attr('fill', '#fff')
