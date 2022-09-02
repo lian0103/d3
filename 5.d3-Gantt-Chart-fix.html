@@ -18,12 +18,6 @@
         margin: auto;
       }
 
-      @media screen and (max-width: 600px) {
-        #d3-container {
-          overflow-x: scroll !important;
-        }
-      }
-
       #tooltip {
         color: white;
         background: #fa283d;
@@ -32,7 +26,6 @@
         display: none;
         padding: 3px 6px;
         margin-left: -90px;
-        font-size: 14px;
       }
 
       #tooltip:before {
@@ -46,6 +39,18 @@
         border-width: 10px;
         border-bottom-color: #fa283d;
         top: -20px;
+      }
+
+      @media screen and (max-width: 600px) {
+        #d3-container {
+          overflow-x: scroll !important;
+        }
+        #tooltip {
+          font-size: 12px;
+        }
+        #tooltip:before {
+          top: -18px;
+        }
       }
     </style>
     <title>Document</title>
