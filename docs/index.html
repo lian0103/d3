@@ -1,127 +1,391 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-  <title>Document</title>
-</head>
-<body>
-  <svg></svg>
-</body>
-<script>
-  console.clear();
-const width = 800;
-const height = 600;
-const padding = 50;
-const innerWidth = width - padding * 2;
-const innerHeight = height - padding * 2;
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://unpkg.com/dayjs@1.11.5/dayjs.min.js"></script>
+    <script src="https://unpkg.com/dayjs@1.8.36/plugin/minMax.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+      }
+      #d3-container {
+        position: relative;
+        overflow: visible;
+        margin: auto;
+      }
 
-const svg = d3.select('svg').attr('width', width).attr('height', height);
-const rootLayer = svg.append('g').attr('transform', `translate(${padding}, ${padding})`);
-const axisLayer = rootLayer.append('g');
-const xAxisLayer = axisLayer.append('g');
-const yAxisLayer = axisLayer.append('g');
-const tasksLayer = rootLayer.append('g');
+      #tooltip {
+        color: white;
+        background: #fa283d;
+        width: 150px;
+        position: absolute;
+        display: none;
+        padding: 3px 6px;
+        margin-left: -90px;
+      }
 
-let series = [];
-let xExtent;
-let yExtent;
-let xScale;
-let yScale;
-let xAxis;
-let yAxis;
+      #tooltip:before {
+        border: solid transparent;
+        content: ' ';
+        height: 0;
+        left: 50%;
+        margin-left: -5px;
+        position: absolute;
+        width: 0;
+        border-width: 10px;
+        border-bottom-color: #fa283d;
+        top: -20px;
+      }
 
-const datas = [
-  {
-    "name": "Task1",
-    "start": "2020/10/09 01:00:00",
-    "end": "2020/10/09 02:00:00",
-    "fill": "#b3e2cd"
-  },
-  {
-    "name": "Task2",
-    "start": "2020/10/09 02:00:00",
-    "end": "2020/10/09 03:00:00",
-    "fill": "#fdcdac"
-  },
-  {
-    "name": "Task3",
-    "start": "2020/10/09 02:00:00",
-    "end": "2020/10/09 04:00:00",
-    "fill": "#cbd5e8"
-  },
-  {
-    "name": "Task4",
-    "start": "2020/10/09 03:00:00",
-    "end": "2020/10/09 04:00:00",
-    "fill": "#f4cae4"
-  },
-  {
-    "name": "Task5",
-    "start": "2020/10/09 03:00:00",
-    "end": "2020/10/09 05:00:00",
-    "fill": "#e6f5c9"
-  }
-];
+      @media screen and (max-width: 600px) {
+        #d3-container {
+          overflow-x: scroll !important;
+        }
+        #tooltip {
+          font-size: 12px;
+        }
+        #tooltip:before {
+          top: -18px;
+        }
+      }
+    </style>
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="d3-container">
+      <div id="tooltip"></div>
+    </div>
+  </body>
+  <script>
+    console.log(d3.version);
 
+    function drawGanttChart(taskArray, boxWidth) {
+      const typeArr = [...taskArray.map((item) => item.type)];
+      const categories = typeArr.filter(
+        (ele, pos) => typeArr.indexOf(ele) == pos
+      );
+      const calcCateGoryitemNum = (category) => {
+        return taskArray.filter((item) => item.type == category).length;
+      };
+      const colorMap = {
+        development: '#00b9fa',
+        coding: '#859eff',
+        promotion: '#e370dd',
+        celebration: '#ff3c83',
+      };
+      const categoryTitleXY = {};
+      const categoryYstar = {};
+      const barsXY = {};
+      const xAxisPos = [];
 
-const preProcess = () => {
-  series = datas.map(data => ({
-    name: data.name,
-    start: new Date(data.start),
-    end: new Date(data.end),
-    fill: data.fill
-  }))
-}
+      const isOver600Width = boxWidth > 600;
 
-const calcExtent = () => {
-  xExtent = [d3.min(series, serie => serie.start), d3.max(series, serie => serie.end)];
-}
+      document
+        .getElementById('d3-container')
+        .setAttribute(
+          'style',
+          `width:${isOver600Width ? boxWidth : window.innerWidth}px`
+        );
 
-const calcScale = () => {
-  xScale = d3.scaleTime().range([0, innerWidth]).domain(xExtent);
-  // 此處使用`ScaleBand`因為是以資料的個別名稱為主，以名稱為類別。
-  yScale = d3.scaleBand().range([0, innerHeight]).domain(series.map(serie => serie.name));
-}
+      const width = boxWidth;
+      const height = isOver600Width
+        ? parseInt(boxWidth * 0.4)
+        : parseInt(boxWidth * 0.45);
+      const bgLineHeight = parseInt(height - 60);
+      const topOffset = parseInt(boxWidth / 20);
+      const leftOffset = parseInt(boxWidth / 8);
+      const rightOffset = parseInt(boxWidth / 20);
+      const barHeight = parseInt(boxWidth / 34);
+      const barWidth = parseInt(boxWidth / 20);
 
-const paintAxis = () => {
-  xAxis = d3.axisBottom().scale(xScale);
-  yAxis = d3.axisLeft().scale(yScale);
-  
-  yAxisLayer.call(yAxis);
-  xAxisLayer.call(xAxis);
-}
+      // xAxis calc
+      var series = taskArray.map((item, i) => ({
+        ...item,
+        idx: i,
+        start: dayjs(item.startTime),
+        end: dayjs(item.endTime),
+      }));
 
-const paintTasks = () => {
-  tasksLayer.selectAll('rect')
-            .data(series)
-            .enter()
+      var xExtent = [
+        d3.min(series, (serie) => serie.start),
+        d3.max(series, (serie) => serie.end),
+      ];
+      var xScale = d3
+        .scaleTime()
+        .range([0, width - leftOffset - rightOffset])
+        .domain(xExtent);
+      const formatDate = d3.timeFormat(isOver600Width ? '%Y/%m/%d' : '%m/%d');
+      var xAxis = d3.axisBottom(xScale).tickFormat(formatDate);
+
+      //start
+      const svg = d3
+        .select('#d3-container')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height + 20);
+
+      const xAxisLayer = svg.append('g');
+      const titleLayer = svg.append('g');
+      const barlineLayer = svg.append('g');
+      const categoryLayer = svg.append('g');
+      const barsLayer = svg.append('g').attr('id', 'barsRects');
+      const barsTextLayer = svg.append('g').attr('id', 'barsTexts');
+
+      const bindToolTipEvent = function (selecten, selectenItemId, isLeaveOff) {
+        selecten.each((item, i) => {
+          svg
+            .select(`#${selectenItemId}-${i}`)
+            .on('mouseover', (e) => {
+              let gapMiddle = (xScale(item.end) - xScale(item.start)) / 2;
+              let tipHtml = `task:${item.task} <br/>
+           type:${item.type}  <br/>
+           ${item.details || ''}`;
+
+              let tooltip = document.getElementById('tooltip');
+              tooltip.innerHTML = tipHtml;
+              tooltip.style.top =
+                barsXY[i].y + (window.innerWidth < 600 ? 20 : 40) + 'px';
+              tooltip.style.left = barsXY[i].x + gapMiddle + 'px';
+              tooltip.style.display = 'block';
+            })
+            .on('mouseout', function () {
+              if (isLeaveOff) {
+                var tooltip = document.getElementById('tooltip');
+                tooltip.style.display = 'none';
+              }
+            });
+        });
+      };
+
+      // title
+      titleLayer
+        .append('text')
+        .text('Gantt Chart Process')
+        .attr('x', isOver600Width ? width / 2 : leftOffset)
+        .attr('y', barHeight)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', 18)
+        .attr('fill', '#009FFC');
+
+        console.log(series)
+      //bgLine
+      barlineLayer
+        .selectAll('rect')
+        .data(series)
+        .join('rect')
+        .attr('x', function (d, i) {
+          xAxisPos[i] = leftOffset + xScale(d.end);
+          console.log(xScale(d.end))
+          return xAxisPos[i];
+        })
+        .attr('y', 50)
+        .attr('width', 1)
+        .attr('height', bgLineHeight)
+        .attr('fill', 'gray');
+      
+
+      //xAxis title
+      titleLayer
+        .append('text')
+        .text(isOver600Width ? '年/月/日' : '月/日')
+        .attr('x', leftOffset - 40)
+        .attr('y', height)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', isOver600Width ? 14 : 12)
+        .attr('fill', 'gray');
+
+      //xAxis
+      xAxisLayer
+        .call(xAxis)
+        .attr('transform', `translate(${leftOffset},${height})`);
+
+      //categories rect
+      let yStart = topOffset + 30;
+      categoryLayer
+        .selectAll('rect')
+        .data(categories)
+        .join(function (enter) {
+          return enter
             .append('rect')
-            .attr('x', serie => xScale(serie.start))
-            // yScale.bandwidth可以得知，全部種類分別的y軸長度為多少。
-            .attr('y', serie => yScale(serie.name) + yScale.bandwidth() * 0.25)
-            // 透過算出頭尾位置，計算出寬度
-            .attr('width', serie => xScale(serie.end) - xScale(serie.start))
-            // 為了讓各個Task中間有空格，因此高度只填滿0.5
-            .attr('height', yScale.bandwidth() * 0.5)
-            .attr('fill', serie => serie.fill)
-}
+            .attr('x', 0)
+            .attr('y', function (d, i) {
+              // console.log(d, i, calcCateGoryitemNum(d));
+              let thisTypeHeight = barHeight * calcCateGoryitemNum(d);
+              yStart += thisTypeHeight;
 
-// 前置資料處理
-preProcess();
+              categoryTitleXY[d] = {
+                x: 10,
+                y: yStart - (barHeight * calcCateGoryitemNum(d)) / 2,
+              };
+              categoryYstar[d] = yStart - thisTypeHeight;
 
-// 計算Extent
-calcExtent();
+              return yStart - thisTypeHeight;
+            })
+            .attr('width', leftOffset + xScale(series[series.length - 1].end))
+            .attr('height', function (d) {
+              return barHeight * calcCateGoryitemNum(d);
+            })
+            .attr('fill', function (d) {
+              return colorMap[d];
+            })
+            .attr('opacity', 0.2);
+        });
 
-// 計算Scale
-calcScale();
+      //category text
+      categoryLayer
+        .selectAll('text')
+        .data(categories)
+        .join(function (enter) {
+          return enter
+            .append('text')
+            .attr('x', function (d) {
+              return categoryTitleXY[d].x;
+            })
+            .attr('y', function (d) {
+              return categoryTitleXY[d].y;
+            })
+            .attr('font-size', isOver600Width ? 14 : 12)
+            .attr('text-anchor', 'start')
+            .attr('text-height', 14)
+            .attr('fill', function (d) {
+              return colorMap[d];
+            })
+            .text(function (d) {
+              return d;
+            });
+        });
 
-// 繪製比例尺
-paintAxis();
+      //bars
+      barsLayer
+        .selectAll('rect')
+        .data(series)
+        .join((enter) => {
+          return enter
+            .append('rect')
+            .attr('x', function (d, i) {
+              barsXY[i] = { x: leftOffset + xScale(d.start) };
+              return leftOffset + xScale(d.start);
+            })
+            .attr('width', function (d) {
+              return xScale(d.end) - xScale(d.start);
+            })
+            .attr('y', function (d, i) {
+              barsXY[i] = { x: barsXY[i].x, y: topOffset + 30 + barHeight * i };
+              return topOffset + 30 + barHeight * i;
+            })
+            .attr('height', barHeight)
+            .attr('fill', (d) => colorMap[d.type])
+            .attr('id', (d) => `barsRectsItem-${d.idx}`);
+        });
 
-// 繪製Task
-paintTasks();
-</script>
+      //bars text
+      barsTextLayer
+        .selectAll('text')
+        .data(series)
+        .join((enter) => {
+          enter
+            .append('text')
+            .attr('x', function (d, i) {
+              return barsXY[i].x + 10;
+            })
+            .attr('y', function (d, i) {
+              return barHeight > 25 ? barsXY[i].y + 16 : barsXY[i].y + 12;
+            })
+            .attr('font-size', isOver600Width ? 14 : 12)
+            .attr('text-anchor', 'start')
+            .attr('text-height', 14)
+            .attr('fill', '#fff')
+            .text((d) => d.task)
+            .attr('id', (d) => `barsTextItem-${d.idx}`);
+        });
+
+      // handle event binding
+      const barsRectsSelecten = d3.select('#barsRects').selectAll('rect');
+      const barsTextsSelecten = d3.select('#barsTexts').selectAll('text');
+      bindToolTipEvent(barsRectsSelecten, 'barsRectsItem', true);
+      bindToolTipEvent(barsTextsSelecten, 'barsTextItem', false);
+    }
+
+    const taskArray = [
+      {
+        task: 'conceptualize',
+        type: 'development',
+        startTime: '2013-1-28',
+        endTime: '2013-2-1',
+        details: "This actually didn't take any conceptualization",
+      },
+
+      {
+        task: 'sketch',
+        type: 'development',
+        startTime: '2013-2-1',
+        endTime: '2013-2-6',
+        details: 'No sketching either, really',
+      },
+
+      {
+        task: 'color profiles',
+        type: 'development',
+        startTime: '2013-2-6',
+        endTime: '2013-2-9',
+      },
+
+      {
+        task: 'HTML',
+        type: 'coding',
+        startTime: '2013-2-2',
+        endTime: '2013-2-6',
+        details: 'all three lines of it',
+      },
+
+      {
+        task: 'write the JS',
+        type: 'coding',
+        startTime: '2013-2-6',
+        endTime: '2013-2-9',
+      },
+
+      {
+        task: 'advertise',
+        type: 'promotion',
+        startTime: '2013-2-9',
+        endTime: '2013-2-12',
+        details: 'This counts, right?',
+      },
+
+      {
+        task: 'spam links',
+        type: 'promotion',
+        startTime: '2013-2-12',
+        endTime: '2013-2-14',
+      },
+      {
+        task: 'eat',
+        type: 'celebration',
+        startTime: '2013-2-8',
+        endTime: '2013-2-13',
+        details: 'All the things',
+      },
+
+      {
+        task: 'crying',
+        type: 'celebration',
+        startTime: '2013-2-13',
+        endTime: '2013-2-16',
+      },
+    ];
+
+    const boxWidth =
+      parseInt(window.innerWidth) > 600
+        ? parseInt(window.innerWidth) > 1200
+          ? 1000
+          : parseInt(window.innerWidth) - 20
+        : 600;
+
+    drawGanttChart(taskArray, boxWidth);
+  </script>
 </html>
